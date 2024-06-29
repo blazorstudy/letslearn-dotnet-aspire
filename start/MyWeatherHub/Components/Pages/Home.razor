@@ -4,7 +4,7 @@
 @inject ILogger<Data.NwsManager> Logger
 @rendermode InteractiveServer
 
-<PageTitle>My Weather Hub</PageTitle>
+<PageTitle>기상청 단기예보 조회 서비스</PageTitle>
 
 <HeadContent>
 	<style>
@@ -19,30 +19,30 @@
 	</style>
 </HeadContent>
 
-<h1>My Weather Hub</h1>
-<h2>Live Weather reports from the US National Weather service</h2>
+<h1>자역별 단기 날씨 예보 조회 서비스</h1>
+<h2>알고 싶은 지역을 선택하시면 날씨 예보를 조회할 수 있는 서비스입니다.</h2>
 
 <div class="row">
 	<div class="col-md-6">
 		<QuickGrid Items="zones" TGridItem="Zone" Pagination="pagination">
-			<TemplateColumn Title="Name" SortBy="NameSort" Sortable="true">
+			<TemplateColumn Title="광역시도">
 				<ColumnOptions>
 					<div class="search-box">
-						<input type="search" autofocus @bind="NameFilter" @bind:event="oninput" placeholder="Name..." />
-					</div>
-				</ColumnOptions>
-				<ChildContent>
-					<span class="link-primary @(SelectedZone == context ? "selectedCell" : "")" style="cursor: pointer;" @onclick="@(() => SelectZone(context))">@context.Name</span>
-				</ChildContent>
-			</TemplateColumn>
-			<TemplateColumn Title="State">
-				<ColumnOptions>
-					<div class="search-box">
-						<input type="search" autofocus @bind="StateFilter" @bind:event="oninput" placeholder="State..." />
+						<input type="search" autofocus @bind="StateFilter" @bind:event="oninput" placeholder="광역시도명..." />
 					</div>
 				</ColumnOptions>
 				<ChildContent>
 					<span class="@(SelectedZone == context ? "selectedCell" : "")">@context.State</span>
+				</ChildContent>
+			</TemplateColumn>
+			<TemplateColumn Title="시군구" SortBy="NameSort" Sortable="true">
+				<ColumnOptions>
+					<div class="search-box">
+						<input type="search" autofocus @bind="NameFilter" @bind:event="oninput" placeholder="행정구역명..." />
+					</div>
+				</ColumnOptions>
+				<ChildContent>
+					<span class="link-primary @(SelectedZone == context ? "selectedCell" : "")" style="cursor: pointer;" @onclick="@(() => SelectZone(context))">@context.Name</span>
 				</ChildContent>
 			</TemplateColumn>
 		</QuickGrid>
@@ -50,10 +50,10 @@
 	</div>
 
 	<div class="col-md-6" style="max-width:30em;">
-		<p>Click the name of a weather zone from the <a href="https://www.weather.gov/documentation/services-web-api" target="_blank">US National Weather Service</a> and the upcoming weather for that zone will appear below.</p>
-		<p>You can sort and filter the list of available weather forecast zones using the column headers of the grid.</p>
-		<p>Not all forecast zones will have a forecast available.  For reliable zones, try Philadelphia, Manhattan, District of Columbia, or Los Angeles County San Gabriel Valley</p>
-		<p>For a zone that isn't reliably reporting, try Bristol Bay, AK (Alaska)</p>
+		<p>시군구 이름을 클릭하면 <a href="https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15084084#/tab_layer_detail_function" target="_blank">기상청 단기예보 조회서비스</a>를 통해서 하단에 단기 날씨 예보를 표시합니다.</p>
+		<p>그리드의 열 헤더를 사용하여 사용 가능한 기상 예보 구역 목록을 정렬하고 필터링할 수 있습니다.</p>
+		<p>공공데이터포털에서 활용신청을 통해 해당 서비스를 사용하실 수 있습니다.</p>
+		<p></p>
 	</div>
 
 </div>
@@ -95,18 +95,15 @@ else if (SelectedZone != null && !string.IsNullOrEmpty(Error))
 	{
 		get
 		{
-
-			var results = AllZones
-				.AsQueryable();
+			var results = AllZones.AsQueryable();
 
 			results = string.IsNullOrEmpty(StateFilter) ? results.AsQueryable()
-					: results.Where(z => z.State == StateFilter.ToUpper()).AsQueryable();
+						: results.Where(z => z.State.Contains(StateFilter, StringComparison.InvariantCultureIgnoreCase));
 
 			results = string.IsNullOrEmpty(NameFilter) ? results
 					: results.Where(z => z.Name.Contains(NameFilter, StringComparison.InvariantCultureIgnoreCase));
 
 			return results;
-
 		}
 	}
 

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace MyWeatherHub.Data
@@ -13,32 +14,42 @@ namespace MyWeatherHub.Data
         
         public async Task<Zone[]?> GetZonesAsync()
         {
+            // 일단 전체를 불러오자
+
+            var list = File.ReadLines("wwwroot/gisData.csv")
+                                .Skip(1)
+                                .Select(line => line.Split(','))
+                                .Where(parts => parts[4] != string.Empty)
+                                .Select(parts => new Zone(parts[1], $"{parts[3]} {parts[4]}", parts[2], parts[5], parts[6])).ToArray();
+
+            return list;
+
             // To get the live zone data from NWS, uncomment the following code and comment out the return statement below
             //var response = await httpClient.GetAsync("https://api.weather.gov/zones?type=forecast");
             //response.EnsureSuccessStatusCode();
             //var content = await response.Content.ReadAsStringAsync();
             //return JsonSerializer.Deserialize<ZonesResponse>(content, options);
 
-            return await cache.GetOrCreateAsync("zones", async entry =>
-            {
-                if (entry is null)
-                    return [];
+            //return await cache.GetOrCreateAsync("zones", async entry =>
+            //{
+            //    if (entry is null)
+            //        return [];
 
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+            //    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
 
-                // Deserialize the zones.json file from the wwwroot folder
-                using var zonesJson = File.Open("wwwroot/zones.json", FileMode.Open);
-                if (zonesJson is null)
-                    return [];
+            //    // Deserialize the zones.json file from the wwwroot folder
+            //    using var zonesJson = File.Open("wwwroot/zones.json", FileMode.Open);
+            //    if (zonesJson is null)
+            //        return [];
 
-                var zones = await JsonSerializer.DeserializeAsync<ZonesResponse>(zonesJson, options);
+            //    var zones = await JsonSerializer.DeserializeAsync<ZonesResponse>(zonesJson, options);
 
-                return zones?.Features
-                            ?.Where(f => f.Properties?.ObservationStations?.Count > 0)
-                            .Select(f => (Zone)f)
-                            .Distinct()
-                            .ToArray() ?? [];
-            });
+            //    return zones?.Features
+            //                ?.Where(f => f.Properties?.ObservationStations?.Count > 0)
+            //                .Select(f => (Zone)f)
+            //                .Distinct()
+            //                .ToArray() ?? [];
+            //});
 
         }
 

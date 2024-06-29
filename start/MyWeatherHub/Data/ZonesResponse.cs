@@ -13,8 +13,8 @@ public class ZonesResponse
         public string? Type { get; set; }
         public Properties? Properties { get; set; }
 
-        public static explicit operator Zone(Feature feature)
-			=> new Zone(feature?.Properties?.Key ?? string.Empty, feature?.Properties?.Name ?? string.Empty, feature?.Properties?.State ?? string.Empty);
+   //     public static explicit operator Zone(Feature feature)
+			//=> new Zone(feature?.Properties?.Key ?? string.Empty, feature?.Properties?.Name ?? string.Empty, feature?.Properties?.State ?? string.Empty);
 
 	}
 
