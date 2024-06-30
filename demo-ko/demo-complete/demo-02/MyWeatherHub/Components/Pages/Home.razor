@@ -1,0 +1,165 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using System.Diagnostics
+@inject NwsManager NwsManager
+@inject ILogger<NwsManager> Logger
+@rendermode InteractiveServer
+
+<PageTitle>기상청 단기예보 조회 서비스</PageTitle>
+
+<HeadContent>
+	<style>
+
+		.quickgrid {
+			width: 100%;
+		}
+
+		.quickgrid td:has(span.selectedCell) {
+			background-color: yellow;
+		}
+	</style>
+</HeadContent>
+
+<h2>지역별 단기 날씨 예보 조회 서비스</h2>
+<h3>알고 싶은 지역을 선택하시면 날씨 예보를 조회할 수 있는 서비스입니다.</h3>
+
+<div class="row">
+	<div class="col-md-6">
+		<QuickGrid Items="zones" TGridItem="Zone" Pagination="pagination">
+			<TemplateColumn Title="광역시도">
+				<ColumnOptions>
+					<div class="search-box">
+						<input type="search" autofocus @bind="StateFilter" @bind:event="oninput" placeholder="광역시도명..." />
+					</div>
+				</ColumnOptions>
+				<ChildContent>
+					<span class="@(SelectedZone == context ? "selectedCell" : "")">@context.State</span>
+				</ChildContent>
+			</TemplateColumn>
+			<TemplateColumn Title="시군구" SortBy="NameSort" Sortable="true">
+				<ColumnOptions>
+					<div class="search-box">
+						<input type="search" autofocus @bind="NameFilter" @bind:event="oninput" placeholder="행정구역명..." />
+					</div>
+				</ColumnOptions>
+				<ChildContent>
+					<span class="link-primary @(SelectedZone == context ? "selectedCell" : "")" style="cursor: pointer;" @onclick="@(() => SelectZone(context))">@context.Name</span>
+				</ChildContent>
+			</TemplateColumn>
+		</QuickGrid>
+		<Paginator State="@pagination"></Paginator>
+	</div>
+
+	<div class="col-md-6" style="max-width:30em;">
+		<p>시군구 이름을 클릭하면 <a href="https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15084084#/tab_layer_detail_function" target="_blank">기상청 단기예보 조회서비스</a>를 통해서 하단에 단기 날씨 예보를 표시합니다.</p>
+		<p>그리드의 열 헤더를 사용하여 사용 가능한 기상 예보 구역 목록을 정렬하고 필터링할 수 있습니다.</p>
+		<p>공공데이터포털에서 활용신청을 통해 해당 서비스를 사용하실 수 있습니다.</p>
+		<p></p>
+	</div>
+
+</div>
+
+@if (IsLoading)
+{
+	<div class="spinner-border" role="status">
+		<span class="visually-hidden">Loading...</span>
+	</div>
+}
+else if (SelectedZone != null && Forecast != null)
+{
+
+	<h3> @SelectedZone.State @SelectedZone.Name 날씨 예보"</h3>
+
+	<div class="row row-cols-1 row-cols-md-4 g-4">
+		@foreach (var forecast in Forecast.Take(8))
+		{
+
+			<div class="col">
+				<div class="card">
+					<div class="card-header">@forecast.Name</div>
+					<div class="card-body">@forecast.DetailedForecast</div>
+				</div>
+			</div>
+
+		}
+	</div>
+
+}
+else if (SelectedZone != null && !string.IsNullOrEmpty(Error))
+{
+	<div class="alert-danger border border-1 border-danger p-3" style="width: 30em">@Error<br />Choose another weather station</div>
+}
+
+@code {
+
+	IQueryable<Zone> zones
+	{
+		get
+		{
+			var results = AllZones
+				.AsQueryable();
+
+			results = string.IsNullOrEmpty(StateFilter) ? results.AsQueryable()
+						: results.Where(z => z.State.Contains(StateFilter, StringComparison.InvariantCultureIgnoreCase));
+
+			results = string.IsNullOrEmpty(NameFilter) ? results
+					: results.Where(z => z.Name.Contains(NameFilter, StringComparison.InvariantCultureIgnoreCase));
+
+			return results;
+
+		}
+	}
+
+	Zone[] AllZones { get; set; } = [];
+
+	PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+
+	string NameFilter { get; set; } = string.Empty;
+
+	string StateFilter { get; set; } = string.Empty;
+
+	GridSort<Zone> NameSort = GridSort<Zone>
+			.ByAscending(f => f.Name);
+
+	Zone SelectedZone { get; set; } = null!;
+
+	IEnumerable<Forecast> Forecast { get; set; } = null!;
+
+	string Error { get; set; } = string.Empty;
+
+	bool IsLoading = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		AllZones = (await NwsManager.GetZonesAsync()).ToArray();
+	}
+
+	private async Task SelectZone(Zone zone)
+	{
+		// Workaround to create a new trace
+		// Blazor server keeps connection open so a new trace isn't created
+		Activity.Current = null;
+
+		SelectedZone = zone;
+		IsLoading = true;
+		StateHasChanged();
+		await Task.Delay(50);
+
+		try
+		{
+			IsLoading = false;
+			Forecast = await NwsManager.GetForecastByZoneAsync(zone);
+			Error = string.Empty;
+		}
+		catch (Exception ex)
+		{
+			IsLoading = false;
+			Logger.LogError(ex, "Error getting forecast for {0}({1})", zone.Name, zone.Key);
+			Forecast = null!;
+			Error = $"Unable to locate weather for {SelectedZone.Name}({SelectedZone.Key})";
+		}
+
+	}
+
+
+}
