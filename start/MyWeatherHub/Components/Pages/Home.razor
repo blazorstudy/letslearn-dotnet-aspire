@@ -128,7 +128,7 @@ else if (SelectedZone != null && !string.IsNullOrEmpty(Error))
 
 	protected override async Task OnInitializedAsync()
 	{
-		AllZones = (await NwsManager.GetZonesAsync()).ToArray();
+		AllZones = NwsManager.GetZones().ToArray();
 	}
 
 	private async Task SelectZone(Zone zone)
@@ -142,7 +142,7 @@ else if (SelectedZone != null && !string.IsNullOrEmpty(Error))
 		try
 		{
 			IsLoading = false;
-			Forecast = await NwsManager.GetForecastByZoneAsync(zone.Key);
+			Forecast = await NwsManager.GetForecastByZoneAsync(zone).ConfigureAwait(false);
 			Error = string.Empty;
 		}
 		catch (Exception ex)
@@ -154,6 +154,4 @@ else if (SelectedZone != null && !string.IsNullOrEmpty(Error))
 		}
 
 	}
-
-
 }

@@ -1,72 +1,59 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
-using System.Diagnostics;
 using System.Text.Json;
+using System.Web;
 
 namespace MyWeatherHub.Data
 {
 
     public class NwsManager(HttpClient httpClient, IMemoryCache cache)
     {
-        JsonSerializerOptions options = new() 
+        JsonSerializerOptions options = new()
         {
             PropertyNameCaseInsensitive = true
         };
-        
-        public async Task<Zone[]?> GetZonesAsync()
+
+        public IEnumerable<Zone> GetZones()
         {
             // 일단 전체를 불러오자
 
-            var list = File.ReadLines("wwwroot/gisData.csv")
+            return File.ReadLines("wwwroot/gisData.csv")
                                 .Skip(1)
                                 .Select(line => line.Split(','))
                                 .Where(parts => parts[4] != string.Empty)
-                                .Select(parts => new Zone(parts[1], $"{parts[3]} {parts[4]}", parts[2], parts[5], parts[6])).ToArray();
-
-            return list;
-
-            // To get the live zone data from NWS, uncomment the following code and comment out the return statement below
-            //var response = await httpClient.GetAsync("https://api.weather.gov/zones?type=forecast");
-            //response.EnsureSuccessStatusCode();
-            //var content = await response.Content.ReadAsStringAsync();
-            //return JsonSerializer.Deserialize<ZonesResponse>(content, options);
-
-            //return await cache.GetOrCreateAsync("zones", async entry =>
-            //{
-            //    if (entry is null)
-            //        return [];
-
-            //    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-
-            //    // Deserialize the zones.json file from the wwwroot folder
-            //    using var zonesJson = File.Open("wwwroot/zones.json", FileMode.Open);
-            //    if (zonesJson is null)
-            //        return [];
-
-            //    var zones = await JsonSerializer.DeserializeAsync<ZonesResponse>(zonesJson, options);
-
-            //    return zones?.Features
-            //                ?.Where(f => f.Properties?.ObservationStations?.Count > 0)
-            //                .Select(f => (Zone)f)
-            //                .Distinct()
-            //                .ToArray() ?? [];
-            //});
-
+                                .Select(parts => new Zone(parts[1], $"{parts[3]} {parts[4]}", parts[2], parts[5], parts[6]));
         }
 
         int forecastCount = 0;
-        public async Task<Forecast[]> GetForecastByZoneAsync(string zoneId)
+
+        public async Task<Forecast[]> GetForecastByZoneAsync(Zone zone)
         {
 
             forecastCount++;
+
             if (forecastCount % 5 == 0)
             {
                 throw new Exception("Random exception thrown by NwsManager.GetForecastAsync");
             }
 
-            var response = await httpClient.GetAsync($"https://api.weather.gov/zones/forecast/{zoneId}/forecast");
-            response.EnsureSuccessStatusCode(); 
-            var forecasts = await response.Content.ReadFromJsonAsync<ForecastResponse>(options);
-            return forecasts?.Properties?.Periods?.Select(p => (Forecast)p).ToArray() ?? [];
+            // Base_time : 0200, 0500, 0800, 1100, 1400, 1700, 2000, 2300 (1일 8회)
+            var queryDate = DateTime.Now.Hour >= 11 ? DateTime.Now : DateTime.Now - TimeSpan.FromDays(1);
+            var query = HttpUtility.ParseQueryString(string.Empty);
+            query["ServiceKey"] = Environment.GetEnvironmentVariable("WeatherForcastServiceKey");
+            query["pageNo"] = "1";
+            query["numOfRows"] = "3000";
+            query["dataType"] = "json";
+            query["base_date"] = $"{queryDate:yyyyMMdd}";
+            query["base_time"] = "1100";
+            query["nx"] = $"{zone.X}";
+            query["ny"] = $"{zone.Y}";
+
+            var response = await httpClient.GetAsync($"http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?{query}").ConfigureAwait(false);
+
+            response.EnsureSuccessStatusCode();
+
+            var forecasts = await response.Content.ReadFromJsonAsync<ForecastResponse>(options).ConfigureAwait(false);
+
+            return forecasts?.Response?.Body?.Items?.GetForecast().ToArray() ?? [];
         }
 
     }
